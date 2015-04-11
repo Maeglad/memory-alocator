@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <assert.h>
 
-int MEMORY_SIZE = 47;
+int MEMORY_SIZE = 4096;
 static FILE *mem = NULL;
 
 int minit(void) {
@@ -76,7 +76,7 @@ int main(int argc, char *argv[]) {
 	if (argc >1)
 		MEMORY_SIZE = atoi(argv[1]);
 	else
-		MEMORY_SIZE = 47;
+		MEMORY_SIZE = 4096;
 
 	assert (MEMORY_SIZE > 0);
 

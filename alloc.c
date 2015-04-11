@@ -51,15 +51,15 @@ void my_init(void) {
 int my_alloc(unsigned int size) {
     int poloha = 0; 
     // ak je mnozstvo pamete rovne 0 tak si osobne myslim ze allocovat nic nemusim
-    if(size == 0)return FAIL;
+    if(size <= 0)return FAIL;
     // hlavcku si musim ulozit nech sa deje cokolvek
-    if(size + 3 > msize())return FAIL;
+    if(size + 3 > msize())return FAIL; 
     // ak je poloha + size < msize tak ma zmysel dalej hladat
     // pozriem sa na polohu ak je free pozbieram data o jej velkosti
     // ak nie skocim na dalsiu
     // ak najdem dost velku polohu tak ju skratim na moju velkost a vyrobim novy 
     while( (poloha + size + 3) <= msize() ){
-        uint8_t obsadene;
+        int obsadene;
         int block = 0;
         obsadene = mread(poloha);
         block = mread(poloha+1)<<8;
@@ -70,7 +70,7 @@ int my_alloc(unsigned int size) {
         }
         else if( block >= size){
             mwrite(poloha, 1);
-            if((block - size) < 3){
+            if((block - size) < 3){// block >= size cize nejdem do -
                 return poloha + 3;
             }
             else{
@@ -105,17 +105,47 @@ int my_alloc(unsigned int size) {
 
 int my_free(unsigned int addr) {
 
-	/* Adresa nie je platnym smernikom, ktory mohol vratit my_alloc */
-	if (addr != 1)
-		return FAIL;
-
-	/* Nie je alokovana ziadna pamat, nemozeme ju teda uvolnit */
-	if (mread(0) != 1)
-		return FAIL;
-
-	/* Vsetko je OK, mozeme uvolnit pamat */
-	mwrite(0, 0);
+	if(overAdresu(addr) == 0){
+        return FAIL;
+    }
+    // adresa je validna musim ist od predu a pozerat na dalsiu adresu ak je free free mergenem
+    int poloha = 0;
+    mwrite(addr - 3, 0);
+    while(poloha < msize()){
+        int blockSize = 0;
+        blockSize = mread(poloha + 1)<<8;
+        blockSize += mread(poloha + 2);
+        if( (poloha + blockSize+3) == msize()){
+            return OK;
+        }
+        if(mread(poloha) == 0){
+            //printf("cistim %d %d\n", poloha, blockSize); 
+            while( ((poloha + blockSize + 3) < msize())&&(mread(poloha + blockSize + 3) == 0) ){
+                int nextSize = 0;
+                nextSize = mread(poloha + blockSize + 3 + 1)<<8;
+                nextSize += mread(poloha + blockSize + 3 + 2);
+                blockSize += nextSize + 3;
+               // printf("%d", blockSize);
+            }
+            mwrite(poloha + 1, blockSize>>8);
+            mwrite(poloha + 2, blockSize & 255);
+        }
+        poloha += blockSize + 3;
+        //printf("%d %d\n", poloha, blockSize); 
+    }
 	return OK;
 }
-
-
+// toto by malo fungovat spravne
+int overAdresu(int addr){
+    if(addr > msize())return 0;
+    if(addr < 3)return 0;
+    if(mread(addr-3) != 1)return 0;
+    int poloha = 0; 
+    while(poloha < (addr-3)){
+        int blockSize = mread(poloha + 1)<<8;
+        blockSize += mread(poloha + 2);
+        poloha += 3 + blockSize;
+    }
+    if(poloha != ( addr-3 ) ){return 0;}
+    return 1; 
+}
