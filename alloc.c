@@ -24,7 +24,8 @@
  */
 void my_init(void) {
     mwrite(0, 0);
-    int memSize = msize()-3; 
+    int memSize = msize()-3;
+    printf("%d",memSize);
     uint8_t pom = memSize>>8; 
     mwrite(1,pom);
     mwrite(2,(uint8_t)(memSize & 255));  
@@ -39,8 +40,9 @@ void my_init(void) {
  *
  * moja idea: hlavcka bude ulozena takto
  *  1 bajt: 0(free) / 1(occupied)
- *  2 bajty: velkost zapisana binarne a splitnuta na byty
+ *  2 bajty: velkost zapisana binarne a splitnuta na byty, velkost bez hlavicky
  *
+ * robim first fit
  *
  * moje predpoklady su ze program testovaca nerobi writy do nepridelenej pamete
  * pamet nepresiahne 2^16 lebo moje hlavicky su ukladane fixne na 3 byty a nechcem riskovat s malom casu
@@ -62,7 +64,31 @@ int my_alloc(unsigned int size) {
         block = mread(poloha+1)<<8;
         block += mread(poloha+2);
         if(obsadene == 1){
-        
+             poloha += 3 + block;
+             continue;
+        }
+        else if( block >= size){
+             mwrite(poloha, 1);
+            
+            if(size - block < 3){
+                return poloha + 3;
+            }
+            else{
+                // vytvaram aj hlavicky k blokom dlzky 0 lebo ak sa ten block za tym uvolni tak ziskam 3 bajty
+                mwrite(poloha + 1, size>>8);
+                mwrite(poloha + 2, size & 255);
+                // zapisem novu velkost do povodnej hlavicky   
+                // nova hlavicka obsahujuca zvysok bloku
+                block = block - size - 3;
+                mwrite(poloha + 3 + size    , 0);
+                mwrite(poloha + 3 + size + 1, block>>8);
+                mwrite(poloha + 3 + size + 2, block & 255);
+                return poloha + 3;
+            }
+            
+        }
+        else {
+            poloha += 3 + block;
         }
     }
 

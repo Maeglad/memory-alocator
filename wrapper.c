@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <assert.h>
 
-int MEMORY_SIZE = 4096;
+int MEMORY_SIZE = 47;
 static FILE *mem = NULL;
 
 int minit(void) {
