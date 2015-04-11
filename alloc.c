@@ -24,8 +24,7 @@
  */
 void my_init(void) {
     mwrite(0, 0);
-    int memSize = msize()-3;
-    printf("%d",memSize);
+    int memSize = msize()-3; 
     uint8_t pom = memSize>>8; 
     mwrite(1,pom);
     mwrite(2,(uint8_t)(memSize & 255));  
@@ -46,6 +45,8 @@ void my_init(void) {
  *
  * moje predpoklady su ze program testovaca nerobi writy do nepridelenej pamete
  * pamet nepresiahne 2^16 lebo moje hlavicky su ukladane fixne na 3 byty a nechcem riskovat s malom casu
+ *
+ * alocator by mal teraz fungovat
  */
 int my_alloc(unsigned int size) {
     int poloha = 0; 
@@ -68,9 +69,8 @@ int my_alloc(unsigned int size) {
              continue;
         }
         else if( block >= size){
-             mwrite(poloha, 1);
-            
-            if(size - block < 3){
+            mwrite(poloha, 1);
+            if((block - size) < 3){
                 return poloha + 3;
             }
             else{

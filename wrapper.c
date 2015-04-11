@@ -76,7 +76,7 @@ int main(int argc, char *argv[]) {
 	if (argc >1)
 		MEMORY_SIZE = atoi(argv[1]);
 	else
-		MEMORY_SIZE = 4096;
+		MEMORY_SIZE = 47;
 
 	assert (MEMORY_SIZE > 0);
 
