@@ -23,10 +23,11 @@
  * na 0.
  */
 void my_init(void) {
-    int memSize = msize()-2; 
+    mwrite(0, 0);
+    int memSize = msize()-3; 
     uint8_t pom = memSize>>8; 
-    mwrite(0,pom);
-    mwrite(1,(uint8_t)(memSize & 255));  
+    mwrite(1,pom);
+    mwrite(2,(uint8_t)(memSize & 255));  
 }
 
 /**
@@ -37,13 +38,13 @@ void my_init(void) {
  * vracia FAIL.
  *
  * moja idea: hlavcka bude ulozena takto
- *  1 bajt[8] : 0(free) / 1(occupied)
- *  1 bajt[0-7], 2 bajt: velkost zapisana binarne a splitnuta na byty, velkost bez hlavicky
+ *  1 bajt: 0(free) / 1(occupied)
+ *  2 bajty: velkost zapisana binarne a splitnuta na byty, velkost bez hlavicky
  *
  * robim first fit
  *
  * moje predpoklady su ze program testovaca nerobi writy do nepridelenej pamete
- * pamet nepresiahne 2^15 lebo moje hlavicky su ukladane fixne na 3 byty a nechcem riskovat s malom casu
+ * pamet nepresiahne 2^16 lebo moje hlavicky su ukladane fixne na 3 byty a nechcem riskovat s malom casu
  *
  * alocator by mal teraz fungovat
  */
@@ -52,42 +53,42 @@ int my_alloc(unsigned int size) {
     // ak je mnozstvo pamete rovne 0 tak si osobne myslim ze allocovat nic nemusim
     if(size <= 0)return FAIL;
     // hlavcku si musim ulozit nech sa deje cokolvek
-    if(size + 2 > msize())return FAIL; 
+    if(size + 3 > msize())return FAIL; 
     // ak je poloha + size < msize tak ma zmysel dalej hladat
     // pozriem sa na polohu ak je free pozbieram data o jej velkosti
     // ak nie skocim na dalsiu
     // ak najdem dost velku polohu tak ju skratim na moju velkost a vyrobim novy 
-    while( (poloha + size + 2) <= msize() ){
+    while( (poloha + size + 3) <= msize() ){
         int obsadene;
         int block = 0;
-        obsadene = mread(poloha) & 128;
-        block = (mread(poloha) & 127)<<8;
-        block += mread(poloha+1);
-        if(obsadene){
-             poloha += 2 + block;
+        obsadene = mread(poloha);
+        block = mread(poloha+1)<<8;
+        block += mread(poloha+2);
+        if(obsadene == 1){
+             poloha += 3 + block;
              continue;
         }
         else if( block >= size){
-            if((block - size) < 2){// block >= size cize nejdem do -
-                int tmp = mread(poloha);
-                mwrite(poloha, tmp + 128);
-                return poloha + 2;
+            mwrite(poloha, 1);
+            if((block - size) < 3){// block >= size cize nejdem do -
+                return poloha + 3;
             }
             else{
-                // vytvaram aj hlavicky k blokom dlzky 0 lebo ak sa ten block za tym uvolni tak ziskam 2 bajty
-                mwrite( poloha, 128 + (size>>8) );
-                mwrite( poloha + 1, size & 255 );
+                // vytvaram aj hlavicky k blokom dlzky 0 lebo ak sa ten block za tym uvolni tak ziskam 3 bajty
+                mwrite(poloha + 1, size>>8);
+                mwrite(poloha + 2, size & 255);
                 // zapisem novu velkost do povodnej hlavicky   
                 // nova hlavicka obsahujuca zvysok bloku
-                block = block - size - 2;
-                mwrite(poloha + 2 + size , ( block>>8) );
-                mwrite(poloha + 2 + size + 1, block & 255);
-                return poloha + 2;
+                block = block - size - 3;
+                mwrite(poloha + 3 + size    , 0);
+                mwrite(poloha + 3 + size + 1, block>>8);
+                mwrite(poloha + 3 + size + 2, block & 255);
+                return poloha + 3;
             }
             
         }
         else {
-            poloha += 2 + block;
+            poloha += 3 + block;
         }
     }
 
@@ -109,30 +110,27 @@ int my_free(unsigned int addr) {
     }
     // adresa je validna musim ist od predu a pozerat na dalsiu adresu ak je free free mergenem
     int poloha = 0;
-    int upperSize = mread(addr-2);
-    mwrite(addr-2, upperSize & 127);
-   // mwrite(addr - 2, 0);// toto musim hodit inam
+    mwrite(addr - 3, 0);
     while(poloha < msize()){
         int blockSize = 0;
-        blockSize = (mread(poloha) & 127)<<8;
-        blockSize += mread(poloha + 1);
-        if( (poloha + blockSize+2) == msize()){
+        blockSize = mread(poloha + 1)<<8;
+        blockSize += mread(poloha + 2);
+        if( (poloha + blockSize+3) == msize()){
             return OK;
         }
-
-        if( ( mread(poloha)&128 ) == 0){
+        if(mread(poloha) == 0){
             //printf("cistim %d %d\n", poloha, blockSize); 
-            while( ((poloha + blockSize + 2) < msize())&&( ( mread(poloha + blockSize + 2)&128 ) == 0) ){
+            while( ((poloha + blockSize + 3) < msize())&&(mread(poloha + blockSize + 3) == 0) ){
                 int nextSize = 0;
-                nextSize = (mread(poloha + blockSize + 2)& 127)<<8;
-                nextSize += mread(poloha + blockSize + 2 + 1);
-                blockSize += nextSize + 2;
+                nextSize = mread(poloha + blockSize + 3 + 1)<<8;
+                nextSize += mread(poloha + blockSize + 3 + 2);
+                blockSize += nextSize + 3;
                // printf("%d", blockSize);
             }
-            mwrite(poloha, blockSize>>8);
-            mwrite(poloha + 1 , blockSize & 255);
+            mwrite(poloha + 1, blockSize>>8);
+            mwrite(poloha + 2, blockSize & 255);
         }
-        poloha += blockSize + 2;
+        poloha += blockSize + 3;
         //printf("%d %d\n", poloha, blockSize); 
     }
 	return OK;
@@ -140,14 +138,14 @@ int my_free(unsigned int addr) {
 // toto by malo fungovat spravne
 int overAdresu(int addr){
     if(addr > msize())return 0;
-    if(addr < 2)return 0;
-    if((mread(addr-2) & 128) != 128)return 0;
+    if(addr < 3)return 0;
+    if(mread(addr-3) != 1)return 0;
     int poloha = 0; 
-    while(poloha < (addr-2)){
-        int blockSize =( mread(poloha) & 127)<<8;
-        blockSize += mread(poloha + 1);
-        poloha += 2 + blockSize;
+    while(poloha < (addr-3)){
+        int blockSize = mread(poloha + 1)<<8;
+        blockSize += mread(poloha + 2);
+        poloha += 3 + blockSize;
     }
-    if(poloha != ( addr-2 ) ){return 0;}
+    if(poloha != ( addr-3 ) ){return 0;}
     return 1; 
 }
